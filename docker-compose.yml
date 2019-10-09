@@ -84,11 +84,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    command: "npm run dev"
+    command: "npm run start"
     volumes:
       - ./frontend/src/:/srv/app/src/
     ports:
-      - "8080:8080"
+      - "8081:8081"
     depends_on:
       - db
 
