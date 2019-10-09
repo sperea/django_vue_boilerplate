@@ -3,12 +3,123 @@ version: '3'
 services:
   db:
     image: postgres
-  web:
-    build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
     volumes:
-      - .:/code
+      - pg_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ./startup.sh
+    environment:
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - REDIS_HOST
+      - REDIS_PORT
+      - REDIS_DB
+      - REDIS_PASSWORD
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_STORAGE_BUCKET_NAME
+      - RABBIT_HOST
+      - RABBIT_PORT
+      - RABBIT_USER
+      - RABBIT_PASSWORD
+      - BACKEND_SECRET
+      - DEBUG
+      - IPYTHONDIR=/root/.ipython
+    volumes:
+      - ./backend/:/srv/app/
+      - ipython_history:/root/.ipython/
     ports:
       - "8000:8000"
     depends_on:
       - db
+      - cache
+      - rabbit
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ./celery.sh
+    environment:
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - REDIS_HOST
+      - REDIS_PORT
+      - REDIS_DB
+      - REDIS_PASSWORD
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_STORAGE_BUCKET_NAME
+      - RABBIT_HOST
+      - RABBIT_PORT
+      - RABBIT_USER
+      - RABBIT_PASSWORD
+      - BACKEND_SECRET
+      - DEBUG
+      - IPYTHONDIR=/root/.ipython
+    volumes:
+      - ./backend/:/srv/app/
+      - ipython_history:/root/.ipython/
+    links:
+      - db
+      - cache
+      - rabbit
+    depends_on:
+      - rabbit
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    command: "npm run dev"
+    volumes:
+      - ./frontend/src/:/srv/app/src/
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  proxy:
+    image: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./proxy/:/etc/nginx/conf.d/
+    depends_on:
+      - frontend
+      - backend
+
+  cache:
+    image: redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+  rabbit:
+    hostname: rabbit
+    image: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBIT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBIT_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  pg_data:
+  redis_data:
+  ipython_history:
