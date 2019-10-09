@@ -98,6 +98,7 @@ services:
       - "80:80"
     volumes:
       - ./proxy/:/etc/nginx/conf.d/
+      - ./logs/nginx/:/var/log/nginx/
     depends_on:
       - frontend
       - backend
